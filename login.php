@@ -1,137 +1,218 @@
 <?php
-// login.php - PERBAIKAN
+// login.php — Autentikasi user dengan bcrypt + Remember Me
 require_once 'config.php';
 
 // Redirect jika sudah login
-if (isset($_SESSION['user_id'])) {
+if (isLoggedIn()) {
     header("Location: dashboard.php");
     exit();
 }
 
-$error = '';
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+// Cek Remember Me cookie
+if (!isLoggedIn() && isset($_COOKIE['remember_token'])) {
     $database = new Database();
     $db = $database->getConnection();
-    
-    $username = trim($_POST['username']);
-    $password = hash('sha256', trim($_POST['password']));
-    
-    $query = "SELECT * FROM users WHERE username = :username";
-    $stmt = $db->prepare($query);
-    $stmt->bindParam(':username', $username);
-    $stmt->execute();
-    
-    if ($stmt->rowCount() > 0) {
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        // Verifikasi password
-        if ($user['password'] === $password) {
-            // Regenerate session ID untuk security
-            session_regenerate_id(true);
-            
-            // Set session variables
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
-            $_SESSION['login_time'] = time();
-            
-            // Log login
-            $logQuery = "INSERT INTO logs (user_id, action, description, ip_address) 
-                        VALUES (:user_id, 'LOGIN', 'User login', :ip)";
-            $logStmt = $db->prepare($logQuery);
-            $logStmt->execute([
-                ':user_id' => $user['id'],
-                ':ip' => $_SERVER['REMOTE_ADDR']
-            ]);
-            
-            // Redirect ke dashboard
-            header("Location: dashboard.php");
-            exit();
-        } else {
-            $error = "Password salah!";
-        }
+
+    $stmt = $db->prepare("SELECT * FROM users WHERE remember_token = ? AND remember_token_expires > NOW()");
+    $stmt->execute([$_COOKIE['remember_token']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user) {
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['role'] = $user['role'];
+        $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
+        $_SESSION['login_time'] = time();
+
+        logActivity($db, $user['id'], 'LOGIN', null, null, 'Auto-login via Remember Me');
+        header("Location: dashboard.php");
+        exit();
     } else {
-        $error = "Username tidak ditemukan!";
+        // Cookie tidak valid — hapus
+        setcookie('remember_token', '', time() - 3600, '/', '', isset($_SERVER['HTTPS']), true);
+    }
+}
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Validasi CSRF
+    verify_csrf();
+
+    $database = new Database();
+    $db = $database->getConnection();
+
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $remember = isset($_POST['remember']);
+
+    if (empty($username) || empty($password)) {
+        $error = 'Username dan password wajib diisi!';
+    } else {
+        $query = "SELECT * FROM users WHERE username = :username";
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':username', $username);
+        $stmt->execute();
+
+        if ($stmt->rowCount() > 0) {
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Verifikasi password dengan bcrypt
+            // Support backward: cek SHA256 lama kalau bcrypt gagal
+            $passwordValid = false;
+            if (verifyPassword($password, $user['password'])) {
+                $passwordValid = true;
+            } elseif ($user['password'] === hash('sha256', $password)) {
+                // Migration: upgrade dari SHA256 ke bcrypt
+                $newHash = hashPassword($password);
+                $updateStmt = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+                $updateStmt->execute([$newHash, $user['id']]);
+                $passwordValid = true;
+            }
+
+            if ($passwordValid) {
+                session_regenerate_id(true);
+
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'];
+                $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
+                $_SESSION['login_time'] = time();
+
+                // Remember Me — set cookie 30 hari
+                if ($remember) {
+                    $token = bin2hex(random_bytes(32));
+                    $expires = date('Y-m-d H:i:s', strtotime('+30 days'));
+                    $stmt = $db->prepare("UPDATE users SET remember_token = ?, remember_token_expires = ? WHERE id = ?");
+                    $stmt->execute([$token, $expires, $user['id']]);
+                    setcookie('remember_token', $token, strtotime('+30 days'), '/', '', isset($_SERVER['HTTPS']), true);
+                }
+
+                logActivity($db, $user['id'], 'LOGIN', null, null, 'User login');
+
+                header("Location: dashboard.php");
+                exit();
+            } else {
+                $error = 'Password salah!';
+            }
+        } else {
+            $error = 'Username tidak ditemukan!';
+        }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sistem Kepegawaian RSUD Mimika</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Login — Sistem Kepegawaian RSUD Mimika</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .login-card {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
             width: 100%;
-            max-width: 400px;
-            padding: 30px;
+            max-width: 420px;
+            padding: 40px 32px;
         }
         .logo {
             text-align: center;
-            padding-bottom: 20px;
-            font-weight: bold;
-            font-size: 24px;
+            padding-bottom: 24px;
+            font-weight: 700;
+            font-size: 26px;
             color: #667eea;
             border-bottom: 2px solid #f0f0f0;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+        }
+        .logo small {
+            display: block;
+            font-size: 14px;
+            font-weight: 400;
+            color: #888;
+            margin-top: 4px;
         }
     </style>
 </head>
 <body>
     <div class="login-card">
         <div class="logo">
-            RSUD MIMIKA<br>
-            <small style="font-size: 14px;">Sistem Kepegawaian</small>
+            RSUD MIMIKA
+            <small>Sistem Kepegawaian</small>
         </div>
-        
+
         <?php if (!empty($error)): ?>
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <?php echo $error; ?>
+                <i class="bi bi-exclamation-triangle me-2"></i><?php echo e($error); ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         <?php endif; ?>
-        
+
+        <?php if (isset($_GET['logout'])): ?>
+            <div class="alert alert-success" role="alert">
+                <i class="bi bi-check-circle me-2"></i> Anda berhasil logout.
+            </div>
+        <?php endif; ?>
+
         <form method="POST" id="loginForm">
+            <?= csrf_field() ?>
+
             <div class="mb-3">
                 <label for="username" class="form-label">Username</label>
-                <input type="text" class="form-control" id="username" name="username" 
-                       value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>" 
-                       required autofocus>
+                <input type="text" class="form-control" id="username" name="username"
+                       value="<?= isset($_POST['username']) ? e($_POST['username']) : '' ?>"
+                       required autofocus autocomplete="username">
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="password" name="password"
+                           required autocomplete="current-password">
+                    <button type="button" class="btn btn-outline-secondary" id="togglePassword" tabindex="-1">
+                        <i class="bi bi-eye" id="toggleIcon"></i>
+                    </button>
+                </div>
             </div>
             <div class="mb-3 form-check">
                 <input type="checkbox" class="form-check-input" id="remember" name="remember">
                 <label class="form-check-label" for="remember">Ingat saya</label>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Login</button>
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-box-arrow-in-right me-1"></i> Login
+            </button>
         </form>
-        
-        <div class="text-center mt-3">
-            <small>
-                <strong>Default login:</strong><br>
-                Username: <code>admin</code><br>
-                Password: <code>admin123</code>
+
+        <div class="text-center mt-4 pt-3 border-top">
+            <small class="text-muted">
+                Default login: <code>admin</code> / <code>admin123</code>
             </small>
         </div>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle password visibility
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            const pwd = document.getElementById('password');
+            const icon = document.getElementById('toggleIcon');
+            if (pwd.type === 'password') {
+                pwd.type = 'text';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            } else {
+                pwd.type = 'password';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            }
+        });
+    </script>
 </body>
 </html>

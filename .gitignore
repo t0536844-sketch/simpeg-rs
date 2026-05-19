@@ -1,0 +1,42 @@
+# Dependencies
+vendor/
+composer.lock
+package.json
+package-lock.json
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Uploads (jangan track file upload di git)
+uploads/*
+!uploads/.gitkeep
+
+# Logs
+*.log
+logs/*.log
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Database backup
+*.sql.bak
+*.sql.old
+
+# Proot distro
+proot-distro/

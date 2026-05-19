@@ -49,6 +49,8 @@ CREATE TABLE users (
     password VARCHAR(255) NOT NULL,
     nama_lengkap VARCHAR(255),
     role ENUM('admin', 'operator', 'viewer') DEFAULT 'operator',
+    remember_token VARCHAR(64) DEFAULT NULL,
+    remember_token_expires DATETIME DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -66,8 +68,10 @@ CREATE TABLE logs (
 );
 
 -- Insert admin default
-INSERT INTO users (username, password, nama_lengkap, role) 
-VALUES ('admin', SHA2('admin123', 256), 'Administrator', 'admin');
+-- Password: admin123 (hashed dengan bcrypt)
+-- Untuk generate hash baru: php -r "echo password_hash('password_anda', PASSWORD_BCRYPT, ['cost' => 12]);"
+INSERT INTO users (username, password, nama_lengkap, role)
+VALUES ('admin', '$2y$12$UCLvTpnKl1Y3nPu4v.zQYuKoppkmUEjwaPYtlE/JVVk.i.3BZtCAe', 'Administrator', 'admin');
 
 -- Insert sample data
 INSERT INTO pegawai (

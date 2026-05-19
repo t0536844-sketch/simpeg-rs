@@ -1,37 +1,29 @@
 <?php
-// logout.php - PERBAIKAN
+// logout.php
 require_once 'config.php';
 
-// Log logout activity jika user login
-if (isset($_SESSION['user_id'])) {
+if (isLoggedIn()) {
     $database = new Database();
     $db = $database->getConnection();
-    
-    $logQuery = "INSERT INTO logs (user_id, action, description, ip_address) 
-                VALUES (:user_id, 'LOGOUT', 'User logout', :ip)";
-    $logStmt = $db->prepare($logQuery);
-    $logStmt->execute([
-        ':user_id' => $_SESSION['user_id'],
-        ':ip' => $_SERVER['REMOTE_ADDR']
-    ]);
+    logActivity($db, $_SESSION['user_id'], 'LOGOUT', null, null, 'User logout');
 }
 
-// Hancurkan session
-$_SESSION = array();
-
-// Hapus cookie session
-if (ini_get("session.use_cookies")) {
-    $params = session_get_cookie_params();
-    setcookie(session_name(), '', time() - 42000,
-        $params["path"], $params["domain"],
-        $params["secure"], $params["httponly"]
-    );
+// Hapus remember token dari DB
+if (isset($_SESSION['user_id'])) {
+    try {
+        $database = new Database();
+        $db = $database->getConnection();
+        $stmt = $db->prepare("UPDATE users SET remember_token = NULL, remember_token_expires = NULL WHERE id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+    } catch (PDOException $e) { /* ignore */ }
 }
 
-// Hancurkan session
+// Hapus cookie remember me
+setcookie('remember_token', '', time() - 3600, '/', '', isset($_SERVER['HTTPS']), true);
+
+// Destroy session
+$_SESSION = [];
 session_destroy();
 
-// Redirect ke login
 header("Location: login.php?logout=1");
-exit();
-?>
+exit;

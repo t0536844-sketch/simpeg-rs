@@ -1,4 +1,9 @@
 <?php
-header("Location: login.php");
-exit();
-?>
+// index.php — Entry point
+require_once 'config.php';
+if (isLoggedIn()) {
+    header('Location: dashboard.php');
+} else {
+    header('Location: login.php');
+}
+exit;

@@ -1,6 +1,3 @@
-nama_lengkap,nip,jabatan,status_kepegawaian,jenis_kelamin,agama,pangkat_golongan
-Dr. Ahmad Fauzi,199001011,Dokter Umum,PNS,Pria,Islam,IV/a
-Nurul Hasanah,199202022,Bidan,Honorer,Wanita,Islam,III/b
-Bambang Sutrisno,198503033,Administrasi,PNS,Pria,Islam,III/c
-Siti Rahmawati,199512124,Perawat,Honorer,Wanita,Islam,III/a
-Drs. Herman Wijaya,197806065,Kepala Bagian,PNS,Pria,Kristen,IV/b
+nama_lengkap,tempat_lahir,tanggal_lahir,agama,jenis_kelamin,nip,pangkat_golongan,pendidikan,status_pernikahan,jabatan,status_kepegawaian,jumlah_keluarga,alamat_rumah
+Dr. Ahmad Fauzi,Nabire,1990-01-01,Islam,Pria,199001011,IV/a,S1 Kedokteran,Menikah,Dokter Umum,PNS,2,Jl. Merdeka No. 1
+Nurul Hasanah,Jayapura,1992-02-02,Islam,Wanita,199202022,III/b,D3 Kebidanan,Belum Menikah,Bidan,Honorer,0,Jl. Sudirman No. 5
