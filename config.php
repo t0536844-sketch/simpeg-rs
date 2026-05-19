@@ -8,6 +8,26 @@
  * - Password hashing dengan bcrypt
  */
 
+// ─── Load .env file (lightweight parser) ───
+if (!defined('ENV_LOADED')) {
+    $envPath = __DIR__ . '/.env';
+    if (file_exists($envPath)) {
+        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') continue;
+            if (strpos($line, '=') !== false) {
+                list($key, $value) = explode('=', $line, 2);
+                $key = trim($key);
+                $value = trim($value, " \t\n\r\0\x0B\"'");
+                putenv("$key=$value");
+                $_ENV[$key] = $value;
+            }
+        }
+    }
+    define('ENV_LOADED', true);
+}
+
 // ─── Session Configuration ───
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_lifetime', '86400');
@@ -27,11 +47,11 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // ─── Database Configuration ───
-// Untuk production, disarankan pakai environment variables atau .env
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'rsud_mimika_kepegawaian');
 define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: 'admin123');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+define('APP_DEBUG', filter_var(getenv('APP_DEBUG') ?: 'false', FILTER_VALIDATE_BOOLEAN));
 
 class Database {
     private $host = DB_HOST;

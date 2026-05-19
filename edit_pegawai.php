@@ -225,7 +225,7 @@ require __DIR__ . '/includes/layout.php';
                     <input type="file" class="form-control" name="<?= $field ?>" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
                     <div class="form-text">Kosongkan jika tidak diubah.</div>
                     <?php if (!empty($pegawai[$field])): ?>
-                    <div class="mt-1"><small><i class="bi bi-paperclip"></i> Saat ini: <a href="<?= e($pegawai[$field]) ?>" target="_blank"><?= e(basename($pegawai[$field])) ?></a></small></div>
+                    <div class="mt-1"><small><i class="bi bi-paperclip"></i> Saat ini: <a href="serve_file.php?file=<?= e($pegawai[$field]) ?>"><?= e(basename($pegawai[$field])) ?></a></small></div>
                     <?php endif; ?>
                 </div>
                 <?php endforeach; ?>

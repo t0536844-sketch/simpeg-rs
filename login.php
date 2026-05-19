@@ -192,11 +192,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </button>
         </form>
 
-        <div class="text-center mt-4 pt-3 border-top">
-            <small class="text-muted">
-                Default login: <code>admin</code> / <code>admin123</code>
-            </small>
-        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

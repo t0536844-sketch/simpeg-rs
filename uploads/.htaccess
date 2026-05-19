@@ -1,0 +1,4 @@
+# Blokir semua akses langsung ke folder uploads/
+# File dokumen HANYA bisa diakses melalui serve_file.php (dengan autentikasi)
+Order Deny,Allow
+Deny from all

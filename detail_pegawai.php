@@ -160,7 +160,7 @@ require __DIR__ . '/includes/layout.php';
             foreach ($docs as $name => $link):
                 if (!empty($link)): $hasDocs = true; ?>
             <div class="col-auto">
-                <a href="<?= e($link) ?>" target="_blank" class="btn btn-sm btn-outline-primary">
+                <a href="serve_file.php?file=<?= e($link) ?>" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-file-earmark me-1"></i><?= e($name) ?>
                 </a>
             </div>
