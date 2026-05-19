@@ -10,14 +10,20 @@
 
 // ─── Session Configuration ───
 if (session_status() === PHP_SESSION_NONE) {
-    session_start([
-        'cookie_lifetime' => 86400,     // 24 jam
-        'cookie_secure'   => isset($_SERVER['HTTPS']), // true kalau HTTPS
-        'cookie_httponly' => true,
-        'cookie_samesite' => 'Lax',
-        'use_strict_mode' => true,
-        'sid_length'      => 48,
-    ]);
+    ini_set('session.cookie_lifetime', '86400');
+    ini_set('session.cookie_httponly', '1');
+    // Jangan set SameSite untuk localhost — bisa bikin CSRF gagal
+    if (!empty($_SERVER['HTTPS'])) {
+        ini_set('session.cookie_secure', '1');
+        ini_set('session.cookie_samesite', 'Lax');
+    }
+    session_start();
+    
+    // Regenerate session ID jika baru (anti session fixation)
+    if (empty($_SESSION['initiated'])) {
+        session_regenerate_id(true);
+        $_SESSION['initiated'] = true;
+    }
 }
 
 // ─── Database Configuration ───
@@ -25,7 +31,7 @@ if (session_status() === PHP_SESSION_NONE) {
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'rsud_mimika_kepegawaian');
 define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_PASS', getenv('DB_PASS') ?: 'admin123');
 
 class Database {
     private $host = DB_HOST;
@@ -37,8 +43,14 @@ class Database {
     public function getConnection() {
         $this->conn = null;
         try {
+            // Cek socket path untuk Termux
+            $socket = '/data/data/com.termux/files/usr/var/run/mysqld.sock';
+            $dsn = file_exists($socket)
+                ? "mysql:unix_socket=$socket;dbname=" . $this->db_name . ";charset=utf8mb4"
+                : "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4";
+
             $this->conn = new PDO(
-                "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4",
+                $dsn,
                 $this->username,
                 $this->password,
                 [
@@ -74,9 +86,10 @@ function csrf_field() {
 function verify_csrf() {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = $_POST['csrf_token'] ?? '';
-        if (!hash_equals($_SESSION['csrf_token'], $token)) {
-            http_response_code(403);
-            die('CSRF token tidak valid. Refresh halaman dan coba lagi.');
+        if (empty($token) || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+            setFlash('error', 'Token keamanan kadaluarsa. Silakan login ulang.');
+            header('Location: login.php');
+            exit;
         }
     }
 }

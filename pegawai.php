@@ -30,6 +30,19 @@ $pageTitle = 'Data Pegawai';
 $activePage = 'pegawai';
 $breadcrumb = [['label' => 'Data Pegawai', 'active' => true]];
 $headerActions = '<a href="tambah_pegawai.php" class="btn btn-primary"><i class="bi bi-person-plus"></i> Tambah Pegawai</a>';
+$extraCSS = '<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">';
+$extraJS = '<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script>
+$(document).ready(function() {
+    $("#pegawaiTable").DataTable({
+        language: { url: "//cdn.datatables.net/plug-ins/1.13.7/i18n/id.json" },
+        pageLength: 25,
+        columnDefs: [{ targets: -1, orderable: false }]
+    });
+});
+</script>';
 require __DIR__ . '/includes/layout.php';
 ?>
 
@@ -105,18 +118,5 @@ require __DIR__ . '/includes/layout.php';
 </div>
 
 <?php
-$extraCSS = '<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">';
-$extraJS = '<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-<script>
-$(document).ready(function() {
-    $("#pegawaiTable").DataTable({
-        language: { url: "//cdn.datatables.net/plug-ins/1.13.7/i18n/id.json" },
-        pageLength: 25,
-        columnDefs: [{ targets: -1, orderable: false }]
-    });
-});
-</script>';
 require __DIR__ . '/includes/layout_footer.php';
 ?>
