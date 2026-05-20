@@ -159,20 +159,30 @@ class Database {
     /** Run migration if database schema is broken or missing */
     private function migrateSQLite() {
         $dbPath = __DIR__ . '/data/rsud_mimika.db';
+        $dataDir = dirname($dbPath);
+
+        // Ensure data directory is writable
+        if (!is_writable($dataDir)) {
+            @chmod($dataDir, 0777);
+        }
 
         try {
-            // Check which tables exist
+            // Verify DB is readable/writable
             $tables = $this->conn->query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users','pegawai','logs')")->fetchAll(PDO::FETCH_COLUMN);
             $hasAll = count($tables) >= 3;
 
             if ($hasAll) {
-                // All tables exist, just seed
-                $this->seedSQLite();
-                return;
+                // Verify admin user actually exists (table could be empty)
+                $adminCount = $this->conn->query("SELECT COUNT(*) FROM users WHERE username = 'admin'")->fetchColumn();
+                if ($adminCount > 0) {
+                    $this->seedSQLite();
+                    return;
+                }
+                // Tables exist but no admin — fall through to recreate
             }
 
-            // Missing tables — delete DB and recreate from scratch
-            $this->conn = null; // close connection first
+            // Corrupt or incomplete DB — delete and recreate
+            $this->conn = null;
             @unlink($dbPath);
             @unlink($dbPath . '-wal');
             @unlink($dbPath . '-shm');
