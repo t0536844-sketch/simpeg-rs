@@ -30,6 +30,12 @@ if (!defined('ENV_LOADED')) {
 
 // ─── Session Configuration ───
 if (session_status() === PHP_SESSION_NONE) {
+    // Set session save path — /app/sessions for HF Spaces, fallback to /tmp
+    $sessionDir = __DIR__ . '/sessions';
+    if (is_dir($sessionDir) && is_writable($sessionDir)) {
+        ini_set('session.save_path', $sessionDir);
+    }
+
     ini_set('session.cookie_lifetime', '86400');
     ini_set('session.cookie_httponly', '1');
     // Jangan set SameSite untuk localhost — bisa bikin CSRF gagal

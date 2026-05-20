@@ -13,6 +13,9 @@ COPY . /app/
 # Create data directory for SQLite with proper permissions
 RUN mkdir -p data && chmod 777 data
 
+# Create session directory and set proper permissions
+RUN mkdir -p /app/sessions && chmod 777 /app/sessions
+
 # Set SQLite mode
 ENV USE_SQLITE=true
 
