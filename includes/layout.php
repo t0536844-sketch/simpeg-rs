@@ -260,9 +260,12 @@ if (!isset($breadcrumb)) $breadcrumb = [];
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
-                    <?php foreach ($breadcrumb as $crumb): ?>
-                    <li class="breadcrumb-item <?= $crumb['active'] ? 'active' : '' ?>">
-                        <?php if (!$crumb['active']): ?><a href="<?= e($crumb['url']) ?>"><?= e($crumb['label']) ?></a>
+                    <?php foreach ($breadcrumb as $crumb):
+                        $isActive = $crumb['active'] ?? false;
+                        $url = $crumb['url'] ?? '#';
+                    ?>
+                    <li class="breadcrumb-item <?= $isActive ? 'active' : '' ?>">
+                        <?php if (!$isActive): ?><a href="<?= e($url) ?>"><?= e($crumb['label']) ?></a>
                         <?php else: ?><?= e($crumb['label']) ?><?php endif; ?>
                     </li>
                     <?php endforeach; ?>
