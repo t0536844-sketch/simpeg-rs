@@ -138,19 +138,13 @@ class Database {
         $dbPath = __DIR__ . '/data/rsud_mimika.db';
         @mkdir(dirname($dbPath), 0755, true);
 
-        $isNew = !file_exists($dbPath);
         $this->conn = new PDO("sqlite:$dbPath");
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         $this->conn->exec('PRAGMA journal_mode=WAL');
         $this->conn->exec('PRAGMA foreign_keys=ON');
 
-        if ($isNew) {
-            $this->initSQLite();
-        }
-
-        // Always try to seed — seedSQLite checks existence before inserting
-        // This fixes old DBs that may have been created without seed data
+        // Always check and fix schema — handles new DBs, corrupted DBs, and missing tables
         $this->migrateSQLite();
 
         return $this->conn;
@@ -161,78 +155,85 @@ class Database {
         $dbPath = __DIR__ . '/data/rsud_mimika.db';
 
         try {
-            // Check if required tables exist
+            // Check which tables exist
             $tables = $this->conn->query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users','pegawai','logs')")->fetchAll(PDO::FETCH_COLUMN);
+            $hasAll = count($tables) >= 3;
 
-            // If any table is missing, recreate from scratch
-            if (count($tables) < 3) {
-                // Delete broken DB and re-init
-                if (file_exists($dbPath)) @unlink($dbPath);
-                if (file_exists($dbPath . '-wal')) @unlink($dbPath . '-wal');
-                if (file_exists($dbPath . '-shm')) @unlink($dbPath . '-shm');
-
-                $this->conn = new PDO("sqlite:$dbPath");
-                $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-                $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-                $this->conn->exec('PRAGMA journal_mode=WAL');
-                $this->conn->exec('PRAGMA foreign_keys=ON');
-                $this->initSQLite();
+            if ($hasAll) {
+                // All tables exist, just seed
+                $this->seedSQLite();
                 return;
             }
 
-            // Tables exist, try to seed
-            $this->seedSQLite();
-        } catch (Exception $e) {
-            // If anything fails, recreate DB from scratch
-            if (file_exists($dbPath)) @unlink($dbPath);
-            if (file_exists($dbPath . '-wal')) @unlink($dbPath . '-wal');
-            if (file_exists($dbPath . '-shm')) @unlink($dbPath . '-shm');
+            // Missing tables — delete DB and recreate from scratch
+            $this->conn = null; // close connection first
+            @unlink($dbPath);
+            @unlink($dbPath . '-wal');
+            @unlink($dbPath . '-shm');
 
             $this->conn = new PDO("sqlite:$dbPath");
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
             $this->conn->exec('PRAGMA journal_mode=WAL');
             $this->conn->exec('PRAGMA foreign_keys=ON');
-            $this->initSQLite();
+            $this->createTables();
+        } catch (Exception $e) {
+            // Fatal — force recreate
+            $this->conn = null;
+            @unlink($dbPath);
+            @unlink($dbPath . '-wal');
+            @unlink($dbPath . '-shm');
+
+            $this->conn = new PDO("sqlite:$dbPath");
+            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            $this->conn->exec('PRAGMA journal_mode=WAL');
+            $this->conn->exec('PRAGMA foreign_keys=ON');
+            $this->createTables();
         }
     }
 
-    private function initSQLite() {
-        // Prefer native SQLite schema file, fall back to MySQL conversion
-        $sqlFile = __DIR__ . '/database_sqlite.sql';
-        if (!file_exists($sqlFile)) {
-            $sqlFile = __DIR__ . '/database.sql';
-        }
-        if (!file_exists($sqlFile)) return;
+    /** Create all tables directly via PHP (no SQL file parsing) */
+    private function createTables() {
+        // Create pegawai table
+        $this->conn->exec("CREATE TABLE IF NOT EXISTS pegawai (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT (datetime('now')),
+            nama_lengkap TEXT NOT NULL,
+            tempat_lahir TEXT, tanggal_lahir TEXT, agama TEXT,
+            jenis_kelamin TEXT, nip TEXT UNIQUE,
+            pangkat_golongan TEXT, pendidikan TEXT,
+            status_pernikahan TEXT, jabatan TEXT, status_kepegawaian TEXT,
+            link_sk TEXT, jumlah_keluarga INTEGER DEFAULT 0,
+            alamat_rumah TEXT, link_ktp TEXT, link_kartu_keluarga TEXT,
+            link_ijazah TEXT, link_str TEXT, masa_berlaku_str TEXT,
+            link_sip TEXT, masa_berlaku_sip TEXT,
+            nomor_kartu_pegawai TEXT, link_npwp TEXT, link_foto TEXT,
+            link_akta_lahir TEXT, link_akta_nikah TEXT, link_skp TEXT,
+            link_sk_kenaikan_pangkat TEXT, link_sk_jabatan TEXT,
+            link_sk_mutasi TEXT, link_sk_pensiun TEXT, link_sertifikat TEXT,
+            created_at DATETIME DEFAULT (datetime('now')),
+            updated_at DATETIME DEFAULT (datetime('now'))
+        )");
 
-        $sql = file_get_contents($sqlFile);
-        $statements = array_filter(array_map('trim', explode(';', $sql)));
+        // Create users table
+        $this->conn->exec("CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL, nama_lengkap TEXT,
+            role TEXT DEFAULT 'operator',
+            remember_token TEXT, remember_token_expires TEXT,
+            created_at DATETIME DEFAULT (datetime('now'))
+        )");
 
-        foreach ($statements as $stmt) {
-            if (empty($stmt) || strpos($stmt, '--') === 0) continue;
+        // Create logs table
+        $this->conn->exec("CREATE TABLE IF NOT EXISTS logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, action TEXT, table_name TEXT,
+            record_id INTEGER, description TEXT, ip_address TEXT,
+            created_at DATETIME DEFAULT (datetime('now'))
+        )");
 
-            // Only convert if using MySQL source
-            if (basename($sqlFile) === 'database.sql') {
-                $stmt = preg_replace('/AUTO_INCREMENT=\d+/', '', $stmt);
-                $stmt = preg_replace('/ENGINE=\w+[^;]*/', '', $stmt);
-                $stmt = preg_replace('/\bint\(\d+\)/i', 'INTEGER', $stmt);
-                $stmt = preg_replace('/\bdouble\b/i', 'REAL', $stmt);
-                $stmt = preg_replace('/\benum\([^)]*\)/i', 'TEXT', $stmt);
-                $stmt = preg_replace('/DEFAULT CURRENT_TIMESTAMP\(\)/i', 'DEFAULT CURRENT_TIMESTAMP', $stmt);
-                $stmt = preg_replace('/ON UPDATE CURRENT_TIMESTAMP\(\)/i', '', $stmt);
-                $stmt = preg_replace('/\butf8mb4_unicode_ci\b/i', '', $stmt);
-                $stmt = preg_replace('/COLLATE\s+\w+/i', '', $stmt);
-                $stmt = preg_replace('/\bunsigned\b/i', '', $stmt);
-            }
-
-            try {
-                $this->conn->exec($stmt);
-            } catch (Exception $e) {
-                // Skip - table may already exist
-            }
-        }
-
-        // Seed default admin user (password: admin123)
         $this->seedSQLite();
     }
 
