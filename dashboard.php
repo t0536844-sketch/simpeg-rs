@@ -27,9 +27,9 @@ $recentEmployees = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // STR/SIP expiring alerts
 $expiringDocs = $db->query("
-    SELECT nama_lengkap, 'STR' as doc, masa_berlaku_str as expiry FROM pegawai WHERE masa_berlaku_str IS NOT NULL AND masa_berlaku_str != '' AND masa_berlaku_str <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    SELECT nama_lengkap, 'STR' as doc, masa_berlaku_str as expiry FROM pegawai WHERE masa_berlaku_str IS NOT NULL AND masa_berlaku_str != '' AND masa_berlaku_str <= date('now', '+30 days')
     UNION ALL
-    SELECT nama_lengkap, 'SIP' as doc, masa_berlaku_sip as expiry FROM pegawai WHERE masa_berlaku_sip IS NOT NULL AND masa_berlaku_sip != '' AND masa_berlaku_sip <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    SELECT nama_lengkap, 'SIP' as doc, masa_berlaku_sip as expiry FROM pegawai WHERE masa_berlaku_sip IS NOT NULL AND masa_berlaku_sip != '' AND masa_berlaku_sip <= date('now', '+30 days')
     ORDER BY expiry ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
