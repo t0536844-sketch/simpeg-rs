@@ -9,11 +9,14 @@ try {
 
     // Check users table
     echo "=== USERS TABLE ===\n";
-    $stmt = $db->query("SELECT id, username, role, substr(password,1,20) as pw_preview FROM users");
+    $stmt = $db->query("SELECT id, username, role, password FROM users");
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($users as $u) {
-        echo "  id={$u['id']} user={$u['username']} role={$u['role']} pw={$u['pw_preview']}...\n";
-        echo "  verify admin123: " . (password_verify('admin123', $u['password']) ? 'YES' : 'NO') . "\n";
+        $pw = $u['password'] ?? 'NULL';
+        $pwPreview = substr($pw, 0, 20);
+        echo "  id={$u['id']} user={$u['username']} role={$u['role']} pw_prefix={$pwPreview}\n";
+        $verify = password_verify('admin123', $pw);
+        echo "  verify admin123: " . ($verify ? 'YES' : 'NO') . "\n";
     }
     echo "Total users: " . count($users) . "\n\n";
 

@@ -245,6 +245,15 @@ class Database {
         if ($count == 0) {
             $stmt = $this->conn->prepare("INSERT INTO users (username, password, nama_lengkap, role) VALUES (?, ?, ?, ?)");
             $stmt->execute(['admin', '$2y$12$UCLvTpnKl1Y3nPu4v.zQYuKoppkmUEjwaPYtlE/JVVk.i.3BZtCAe', 'Administrator', 'admin']);
+        } else {
+            // Admin exists but password might be corrupted from old seeding — verify and fix
+            $stmt = $this->conn->prepare("SELECT password FROM users WHERE username = 'admin'");
+            $stmt->execute();
+            $existingHash = $stmt->fetchColumn();
+            if (!$existingHash || !password_verify('admin123', $existingHash)) {
+                $newHash = '$2y$12$UCLvTpnKl1Y3nPu4v.zQYuKoppkmUEjwaPYtlE/JVVk.i.3BZtCAe';
+                $this->conn->prepare("UPDATE users SET password = ? WHERE username = 'admin'")->execute([$newHash]);
+            }
         }
 
         // Check if sample pegawai already exists
