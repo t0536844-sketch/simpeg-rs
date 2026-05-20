@@ -39,19 +39,101 @@ require __DIR__ . '/includes/layout.php';
 ?>
 
 <?php if (!empty($expiringDocs)): ?>
-<div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
-    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle me-1"></i> Peringatan Masa Berlaku Dokumen</h6>
-    <p class="mb-2 small">Ada <strong><?= count($expiringDocs) ?></strong> dokumen yang akan segera kadaluarsa atau sudah kadaluarsa (30 hari terakhir):</p>
-    <ul class="mb-0 small">
-        <?php foreach ($expiringDocs as $d): 
-            $days = floor((strtotime($d['expiry']) - time()) / 86400);
-            $badge = $days <= 0 ? 'bg-danger' : 'bg-warning';
-            $label = $days <= 0 ? 'Kadaluarsa' : $days . ' hari lagi';
-        ?>
-        <li><strong><?= e($d['nama_lengkap']) ?></strong> — <?= e($d['doc']) ?> (<?= date('d/m/Y', strtotime($d['expiry'])) ?>) <span class="badge <?= $badge ?>"><?= $label ?></span></li>
-        <?php endforeach; ?>
-    </ul>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<!-- Peringatan Masa Berlaku Dokumen -->
+<div class="card mb-4 border-warning" style="border-width:2px">
+    <div class="card-header" style="background:#fff3cd">
+        <h6 class="mb-0">
+            <i class="bi bi-exclamation-triangle text-warning me-1"></i> Peringatan Masa Berlaku Dokumen
+            <span class="badge bg-warning text-dark ms-2"><?= count($expiringDocs) ?> dokumen</span>
+        </h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Nama Pegawai</th>
+                        <th>Dokumen</th>
+                        <th>Masa Berlaku</th>
+                        <th>Status</th>
+                        <th>Sisa Waktu</th>
+                        <th>Tindak Lanjut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $no = 1;
+                    foreach ($expiringDocs as $d):
+                        $days = floor((strtotime($d['expiry']) - time()) / 86400);
+
+                        if ($days <= 0) {
+                            $statusBadge = 'bg-danger';
+                            $statusText = 'Kadaluarsa';
+                            $rowClass = 'table-danger';
+                            $icon = 'bi-x-circle-fill';
+                            $action = 'Segera perpanjang!';
+                            $actionClass = 'text-danger fw-bold';
+                        } elseif ($days <= 7) {
+                            $statusBadge = 'bg-danger';
+                            $statusText = 'Kritis';
+                            $rowClass = 'table-warning';
+                            $icon = 'bi-exclamation-circle-fill';
+                            $action = 'Perpanjang minggu ini';
+                            $actionClass = 'text-danger fw-bold';
+                        } elseif ($days <= 14) {
+                            $statusBadge = 'bg-warning text-dark';
+                            $statusText = 'Segera';
+                            $rowClass = '';
+                            $icon = 'bi-exclamation-triangle-fill';
+                            $action = 'Siapkan berkas perpanjangan';
+                            $actionClass = 'text-warning';
+                        } else {
+                            $statusBadge = 'bg-info';
+                            $statusText = 'Peringatan';
+                            $rowClass = '';
+                            $icon = 'bi-info-circle-fill';
+                            $action = 'Jadwalkan perpanjangan';
+                            $actionClass = 'text-info';
+                        }
+                    ?>
+                    <tr class="<?= $rowClass ?>">
+                        <td><?= $no++ ?></td>
+                        <td>
+                            <strong><?= e($d['nama_lengkap']) ?></strong>
+                        </td>
+                        <td>
+                            <?php if ($d['doc'] === 'STR'): ?>
+                                <span class="badge bg-primary"><?= $d['doc'] ?></span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary"><?= $d['doc'] ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= date('d F Y', strtotime($d['expiry'])) ?></td>
+                        <td>
+                            <span class="badge <?= $statusBadge ?>">
+                                <i class="bi <?= $icon ?>"></i> <?= $statusText ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if ($days < 0): ?>
+                                <span class="<?= $actionClass ?>">Sudah <?= abs($days) ?> hari lalu</span>
+                            <?php elseif ($days == 0): ?>
+                                <span class="<?= $actionClass ?>">Hari ini!</span>
+                            <?php else: ?>
+                                <span class="<?= $actionClass ?>"><?= $days ?> hari lagi</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><small class="<?= $actionClass ?>"><?= $action ?></small></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer text-muted" style="font-size:0.8rem">
+        <i class="bi bi-info-circle"></i> Ditampilkan dokumen yang akan kadaluarsa dalam 30 hari ke depan. Data diambil dari kolom Masa Berlaku STR/SIP pada data pegawai.
+    </div>
 </div>
 <?php endif; ?>
 

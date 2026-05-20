@@ -35,7 +35,9 @@ if ($statusFilter) {
     $countQuery .= " AND status_kepegawaian = ?";
     $countParams[] = $statusFilter;
 }
-$totalRecords = $db->query($countQuery, $countParams)->fetch(PDO::FETCH_ASSOC)['c'];
+$totalRecords = $db->prepare($countQuery);
+$totalRecords->execute($countParams);
+$totalRecords = $totalRecords->fetch(PDO::FETCH_ASSOC)['c'];
 $totalPages = ceil($totalRecords / $perPage);
 
 $query .= " ORDER BY nama_lengkap ASC LIMIT $perPage OFFSET $offset";
