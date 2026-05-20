@@ -153,7 +153,11 @@ class Database {
     }
 
     private function initSQLite() {
-        $sqlFile = __DIR__ . '/database.sql';
+        // Prefer native SQLite schema file, fall back to MySQL conversion
+        $sqlFile = __DIR__ . '/database_sqlite.sql';
+        if (!file_exists($sqlFile)) {
+            $sqlFile = __DIR__ . '/database.sql';
+        }
         if (!file_exists($sqlFile)) return;
 
         $sql = file_get_contents($sqlFile);
@@ -162,22 +166,24 @@ class Database {
         foreach ($statements as $stmt) {
             if (empty($stmt) || strpos($stmt, '--') === 0) continue;
 
-            // Convert MySQL to SQLite
-            $stmt = preg_replace('/AUTO_INCREMENT=\d+/', '', $stmt);
-            $stmt = preg_replace('/ENGINE=\w+[^;]*/', '', $stmt);
-            $stmt = preg_replace('/\bint\(\d+\)/i', 'INTEGER', $stmt);
-            $stmt = preg_replace('/\bdouble\b/i', 'REAL', $stmt);
-            $stmt = preg_replace('/\benum\([^)]*\)/i', 'TEXT', $stmt);
-            $stmt = preg_replace('/DEFAULT CURRENT_TIMESTAMP\(\)/i', 'DEFAULT CURRENT_TIMESTAMP', $stmt);
-            $stmt = preg_replace('/ON UPDATE CURRENT_TIMESTAMP\(\)/i', '', $stmt);
-            $stmt = preg_replace('/\butf8mb4_unicode_ci\b/i', '', $stmt);
-            $stmt = preg_replace('/COLLATE\s+\w+/i', '', $stmt);
-            $stmt = preg_replace('/\bunsigned\b/i', '', $stmt);
+            // Only convert if using MySQL source
+            if (basename($sqlFile) === 'database.sql') {
+                $stmt = preg_replace('/AUTO_INCREMENT=\d+/', '', $stmt);
+                $stmt = preg_replace('/ENGINE=\w+[^;]*/', '', $stmt);
+                $stmt = preg_replace('/\bint\(\d+\)/i', 'INTEGER', $stmt);
+                $stmt = preg_replace('/\bdouble\b/i', 'REAL', $stmt);
+                $stmt = preg_replace('/\benum\([^)]*\)/i', 'TEXT', $stmt);
+                $stmt = preg_replace('/DEFAULT CURRENT_TIMESTAMP\(\)/i', 'DEFAULT CURRENT_TIMESTAMP', $stmt);
+                $stmt = preg_replace('/ON UPDATE CURRENT_TIMESTAMP\(\)/i', '', $stmt);
+                $stmt = preg_replace('/\butf8mb4_unicode_ci\b/i', '', $stmt);
+                $stmt = preg_replace('/COLLATE\s+\w+/i', '', $stmt);
+                $stmt = preg_replace('/\bunsigned\b/i', '', $stmt);
+            }
 
             try {
                 $this->conn->exec($stmt);
             } catch (Exception $e) {
-                // Skip - table may already exist
+                // Skip - table/record may already exist
             }
         }
     }

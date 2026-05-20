@@ -13,7 +13,7 @@ if (!isLoggedIn() && isset($_COOKIE['remember_token'])) {
     $database = new Database();
     $db = $database->getConnection();
 
-    $stmt = $db->prepare("SELECT * FROM users WHERE remember_token = ? AND remember_token_expires > NOW()");
+    $stmt = $db->prepare("SELECT * FROM users WHERE remember_token = ? AND remember_token_expires > datetime('now')");
     $stmt->execute([$_COOKIE['remember_token']]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
