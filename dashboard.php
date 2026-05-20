@@ -3,6 +3,8 @@
 require_once 'config.php';
 requireLogin();
 
+require_once __DIR__ . '/includes/notifikasi_helper.php';
+
 $database = new Database();
 $db = $database->getConnection();
 
@@ -25,13 +27,10 @@ foreach ($queries as $key => $q) {
 $recentStmt = $db->query("SELECT * FROM pegawai ORDER BY created_at DESC LIMIT 10");
 $recentEmployees = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// STR/SIP expiring alerts
-$expiringDocs = $db->query("
-    SELECT nama_lengkap, 'STR' as doc, masa_berlaku_str as expiry FROM pegawai WHERE masa_berlaku_str IS NOT NULL AND masa_berlaku_str != '' AND masa_berlaku_str <= date('now', '+30 days')
-    UNION ALL
-    SELECT nama_lengkap, 'SIP' as doc, masa_berlaku_sip as expiry FROM pegawai WHERE masa_berlaku_sip IS NOT NULL AND masa_berlaku_sip != '' AND masa_berlaku_sip <= date('now', '+30 days')
-    ORDER BY expiry ASC
-")->fetchAll(PDO::FETCH_ASSOC);
+// STR/SIP expiring alerts (using new helper)
+$allNotif = getExpiryNotifications($db);
+$notifCounts = countExpiryBySeverity($allNotif);
+$expiringDocs = array_slice($allNotif, 0, 10); // Show top 10 in dashboard
 
 $pageTitle = 'Dashboard';
 $activePage = 'dashboard';
@@ -42,10 +41,15 @@ require __DIR__ . '/includes/layout.php';
 <!-- Peringatan Masa Berlaku Dokumen -->
 <div class="card mb-4 border-warning" style="border-width:2px">
     <div class="card-header" style="background:#fff3cd">
-        <h6 class="mb-0">
-            <i class="bi bi-exclamation-triangle text-warning me-1"></i> Peringatan Masa Berlaku Dokumen
-            <span class="badge bg-warning text-dark ms-2"><?= count($expiringDocs) ?> dokumen</span>
-        </h6>
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">
+                <i class="bi bi-exclamation-triangle text-warning me-1"></i> Peringatan Masa Berlaku Dokumen
+                <span class="badge bg-warning text-dark ms-2"><?= $notifCounts['total'] ?> dokumen</span>
+            </h6>
+            <a href="notifikasi.php" class="btn btn-sm btn-outline-warning">
+                Lihat Semua <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -65,43 +69,18 @@ require __DIR__ . '/includes/layout.php';
                     <?php
                     $no = 1;
                     foreach ($expiringDocs as $d):
-                        $days = floor((strtotime($d['expiry']) - time()) / 86400);
-
-                        if ($days <= 0) {
-                            $statusBadge = 'bg-danger';
-                            $statusText = 'Kadaluarsa';
-                            $rowClass = 'table-danger';
-                            $icon = 'bi-x-circle-fill';
-                            $action = 'Segera perpanjang!';
-                            $actionClass = 'text-danger fw-bold';
-                        } elseif ($days <= 7) {
-                            $statusBadge = 'bg-danger';
-                            $statusText = 'Kritis';
-                            $rowClass = 'table-warning';
-                            $icon = 'bi-exclamation-circle-fill';
-                            $action = 'Perpanjang minggu ini';
-                            $actionClass = 'text-danger fw-bold';
-                        } elseif ($days <= 14) {
-                            $statusBadge = 'bg-warning text-dark';
-                            $statusText = 'Segera';
-                            $rowClass = '';
-                            $icon = 'bi-exclamation-triangle-fill';
-                            $action = 'Siapkan berkas perpanjangan';
-                            $actionClass = 'text-warning';
-                        } else {
-                            $statusBadge = 'bg-info';
-                            $statusText = 'Peringatan';
-                            $rowClass = '';
-                            $icon = 'bi-info-circle-fill';
-                            $action = 'Jadwalkan perpanjangan';
-                            $actionClass = 'text-info';
-                        }
+                        $badgeClass = severityBadgeClass($d['severity']);
+                        $label = severityLabel($d['severity']);
+                        $icon = severityIcon($d['severity']);
+                        $rowClass = match($d['severity']) {
+                            'expired' => 'table-danger',
+                            'kritis' => 'table-warning',
+                            default => '',
+                        };
                     ?>
                     <tr class="<?= $rowClass ?>">
                         <td><?= $no++ ?></td>
-                        <td>
-                            <strong><?= e($d['nama_lengkap']) ?></strong>
-                        </td>
+                        <td><strong><?= e($d['nama']) ?></strong></td>
                         <td>
                             <?php if ($d['doc'] === 'STR'): ?>
                                 <span class="badge bg-primary"><?= $d['doc'] ?></span>
@@ -111,20 +90,30 @@ require __DIR__ . '/includes/layout.php';
                         </td>
                         <td><?= date('d F Y', strtotime($d['expiry'])) ?></td>
                         <td>
-                            <span class="badge <?= $statusBadge ?>">
-                                <i class="bi <?= $icon ?>"></i> <?= $statusText ?>
+                            <span class="badge <?= $badgeClass ?>">
+                                <i class="bi <?= $icon ?>"></i> <?= $label ?>
                             </span>
                         </td>
                         <td>
-                            <?php if ($days < 0): ?>
-                                <span class="<?= $actionClass ?>">Sudah <?= abs($days) ?> hari lalu</span>
-                            <?php elseif ($days == 0): ?>
-                                <span class="<?= $actionClass ?>">Hari ini!</span>
+                            <?php if ($d['days'] < 0): ?>
+                                <span class="text-danger fw-bold">Sudah <?= abs($d['days']) ?> hari lalu</span>
+                            <?php elseif ($d['days'] == 0): ?>
+                                <span class="text-danger fw-bold">Hari ini!</span>
                             <?php else: ?>
-                                <span class="<?= $actionClass ?>"><?= $days ?> hari lagi</span>
+                                <span class="fw-bold"><?= $d['days'] ?> hari lagi</span>
                             <?php endif; ?>
                         </td>
-                        <td><small class="<?= $actionClass ?>"><?= $action ?></small></td>
+                        <td>
+                            <?php if ($d['severity'] === 'expired'): ?>
+                                <small class="text-danger fw-bold">Segera perpanjang!</small>
+                            <?php elseif ($d['severity'] === 'kritis'): ?>
+                                <small class="text-danger fw-bold">Perpanjang minggu ini</small>
+                            <?php elseif ($d['severity'] === 'segera'): ?>
+                                <small class="text-warning">Siapkan berkas</small>
+                            <?php else: ?>
+                                <small class="text-info">Jadwalkan perpanjangan</small>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -132,7 +121,7 @@ require __DIR__ . '/includes/layout.php';
         </div>
     </div>
     <div class="card-footer text-muted" style="font-size:0.8rem">
-        <i class="bi bi-info-circle"></i> Ditampilkan dokumen yang akan kadaluarsa dalam 30 hari ke depan. Data diambil dari kolom Masa Berlaku STR/SIP pada data pegawai.
+        <i class="bi bi-info-circle"></i> Ditampilkan 10 dokumen paling mendesak. <a href="notifikasi.php">Lihat semua <?= $notifCounts['total'] ?> notifikasi</a>.
     </div>
 </div>
 <?php endif; ?>

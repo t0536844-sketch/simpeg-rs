@@ -13,6 +13,20 @@
 if (!isset($pageTitle)) $pageTitle = 'SIM Kepegawaian';
 if (!isset($activePage)) $activePage = '';
 if (!isset($breadcrumb)) $breadcrumb = [];
+
+// Compute notification count for sidebar badge
+$notifCount = 0;
+if (isLoggedIn()) {
+    try {
+        require_once __DIR__ . '/notifikasi_helper.php';
+        $notifDb = (new Database())->getConnection();
+        $allNotif = getExpiryNotifications($notifDb);
+        $notifCounts = countExpiryBySeverity($allNotif);
+        $notifCount = $notifCounts['total'];
+    } catch (Exception $e) {
+        // Silent fail — sidebar still renders
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -327,7 +341,16 @@ if (!isset($breadcrumb)) $breadcrumb = [];
         </a>
         <?php endif; ?>
         <a class="nav-link <?= $activePage === 'export' ? 'active' : '' ?>" href="export.php">
-            <i class="bi bi-download"></i> Export Data
+            <i class="bi bi-download"></i> Export CSV
+        </a>
+        <a class="nav-link <?= $activePage === 'export_pdf' ? 'active' : '' ?>" href="export_pdf.php">
+            <i class="bi bi-file-earmark-pdf"></i> Export PDF
+        </a>
+        <a class="nav-link <?= $activePage === 'notifikasi' ? 'active' : '' ?>" href="notifikasi.php">
+            <i class="bi bi-bell-fill"></i> Notifikasi
+            <?php if ($notifCount > 0): ?>
+                <span class="badge bg-danger ms-1"><?= $notifCount ?></span>
+            <?php endif; ?>
         </a>
         <a class="nav-link <?= $activePage === 'laporan' ? 'active' : '' ?>" href="laporan.php">
             <i class="bi bi-file-earmark-text"></i> Laporan
