@@ -98,8 +98,14 @@ class Database {
 
     public function getConnection() {
         $this->conn = null;
+
+        // Use SQLite if USE_SQLITE=true (for HF Spaces / Docker deployment)
+        if (getenv('USE_SQLITE') === 'true') {
+            return $this->getSQLiteConnection();
+        }
+
+        // Try MySQL first
         try {
-            // Cek socket path untuk Termux
             $socket = '/data/data/com.termux/files/usr/var/run/mysqld.sock';
             $dsn = file_exists($socket)
                 ? "mysql:unix_socket=$socket;dbname=" . $this->db_name . ";charset=utf8mb4"
@@ -116,13 +122,64 @@ class Database {
                 ]
             );
         } catch (PDOException $exception) {
-            // Jangan tampilkan detail error di production
+            // Fallback to SQLite if MySQL fails
+            if (getenv('USE_SQLITE') !== 'false') {
+                return $this->getSQLiteConnection();
+            }
             if (defined('APP_DEBUG') && APP_DEBUG) {
                 die("Connection error: " . $exception->getMessage());
             }
-            die("Koneksi database gagal. Periksa konfigurasi.");
+            die("Koneksi database gagal.");
         }
         return $this->conn;
+    }
+
+    private function getSQLiteConnection() {
+        $dbPath = __DIR__ . '/data/rsud_mimika.db';
+        @mkdir(dirname($dbPath), 0755, true);
+
+        $isNew = !file_exists($dbPath);
+        $this->conn = new PDO("sqlite:$dbPath");
+        $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $this->conn->exec('PRAGMA journal_mode=WAL');
+        $this->conn->exec('PRAGMA foreign_keys=ON');
+
+        if ($isNew) {
+            $this->initSQLite();
+        }
+
+        return $this->conn;
+    }
+
+    private function initSQLite() {
+        $sqlFile = __DIR__ . '/database.sql';
+        if (!file_exists($sqlFile)) return;
+
+        $sql = file_get_contents($sqlFile);
+        $statements = array_filter(array_map('trim', explode(';', $sql)));
+
+        foreach ($statements as $stmt) {
+            if (empty($stmt) || strpos($stmt, '--') === 0) continue;
+
+            // Convert MySQL to SQLite
+            $stmt = preg_replace('/AUTO_INCREMENT=\d+/', '', $stmt);
+            $stmt = preg_replace('/ENGINE=\w+[^;]*/', '', $stmt);
+            $stmt = preg_replace('/\bint\(\d+\)/i', 'INTEGER', $stmt);
+            $stmt = preg_replace('/\bdouble\b/i', 'REAL', $stmt);
+            $stmt = preg_replace('/\benum\([^)]*\)/i', 'TEXT', $stmt);
+            $stmt = preg_replace('/DEFAULT CURRENT_TIMESTAMP\(\)/i', 'DEFAULT CURRENT_TIMESTAMP', $stmt);
+            $stmt = preg_replace('/ON UPDATE CURRENT_TIMESTAMP\(\)/i', '', $stmt);
+            $stmt = preg_replace('/\butf8mb4_unicode_ci\b/i', '', $stmt);
+            $stmt = preg_replace('/COLLATE\s+\w+/i', '', $stmt);
+            $stmt = preg_replace('/\bunsigned\b/i', '', $stmt);
+
+            try {
+                $this->conn->exec($stmt);
+            } catch (Exception $e) {
+                // Skip - table may already exist
+            }
+        }
     }
 }
 
