@@ -126,12 +126,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             $query = "SELECT * FROM users WHERE username = :username";
             $stmt = $db->prepare($query);
-            $stmt->bindParam(':username', $username);
-            $stmt->execute();
+            $stmt->execute([':username' => $username]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($stmt->rowCount() > 0) {
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
+            if ($user) {
                 // Verifikasi password dengan bcrypt
                 // Support backward: cek SHA256 lama kalau bcrypt gagal
                 $passwordValid = false;
