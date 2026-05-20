@@ -10,11 +10,8 @@ WORKDIR /app
 # Copy all app files
 COPY . /app/
 
-# Create data directory for SQLite with proper permissions
-RUN mkdir -p data && chmod 777 data
-
-# Create session directory and set proper permissions
-RUN mkdir -p /app/sessions && chmod 777 /app/sessions
+# Create data and sessions directories with proper permissions
+RUN mkdir -p data sessions && chmod -R 777 data sessions
 
 # Set SQLite mode
 ENV USE_SQLITE=true
