@@ -27,8 +27,68 @@ if (!isset($breadcrumb)) $breadcrumb = [];
             --primary: #667eea;
             --secondary: #764ba2;
             --sidebar-width: 260px;
+            --bg-body: #f4f6f9;
+            --bg-card: #ffffff;
+            --text-body: #212529;
+            --text-muted: #6c757d;
+            --border-color: rgba(0,0,0,0.08);
+            --shadow-card: 0 1px 3px rgba(0,0,0,0.08);
         }
-        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+
+        /* Dark mode variables */
+        [data-theme="dark"] {
+            --bg-body: #1a1d23;
+            --bg-card: #252830;
+            --text-body: #e4e6eb;
+            --text-muted: #a0a3a8;
+            --border-color: rgba(255,255,255,0.08);
+            --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg-body); color: var(--text-body); }
+        .main-content { background: var(--bg-body); }
+        .card { background: var(--bg-card); box-shadow: var(--shadow-card); }
+        .card-header.bg-white { background: var(--bg-card) !important; border-bottom: 1px solid var(--border-color); }
+        .table { color: var(--text-body); }
+        .table > :not(caption) > * > * { border-bottom-color: var(--border-color); }
+        .text-muted { color: var(--text-muted) !important; }
+        .breadcrumb-item a { color: var(--primary); }
+        .sidebar-user { background: rgba(255,255,255,0.12); }
+
+        /* Dark mode form adjustments */
+        [data-theme="dark"] .form-control,
+        [data-theme="dark"] .form-select {
+            background-color: #2d3038;
+            border-color: #3d4048;
+            color: #e4e6eb;
+        }
+        [data-theme="dark"] .form-control:focus,
+        [data-theme="dark"] .form-select:focus {
+            background-color: #2d3038;
+            border-color: var(--primary);
+            color: #e4e6eb;
+        }
+        [data-theme="dark"] .modal-content {
+            background: #252830;
+            color: #e4e6eb;
+        }
+        [data-theme="dark"] .table-hover tbody tr:hover {
+            background-color: rgba(255,255,255,0.04);
+        }
+        [data-theme="dark"] .pagination .page-link {
+            background-color: #252830;
+            border-color: #3d4048;
+            color: #e4e6eb;
+        }
+        [data-theme="dark"] .pagination .active .page-link {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+        [data-theme="dark"] .border { border-color: var(--border-color) !important; }
+        [data-theme="dark"] .alert-info { background-color: #1e3a5f; color: #93c5fd; border-color: #1e3a5f; }
+        [data-theme="dark"] .alert-warning { background-color: #4a3b1e; color: #fde68a; border-color: #4a3b1e; }
+        [data-theme="dark"] .alert-success { background-color: #1e4a2e; color: #86efac; border-color: #1e4a2e; }
+        [data-theme="dark"] .alert-danger { background-color: #4a1e1e; color: #fca5a5; border-color: #4a1e1e; }
 
         /* Sidebar */
         .sidebar {
@@ -173,6 +233,9 @@ if (!isset($breadcrumb)) $breadcrumb = [];
         </a>
         <?php if (isAdmin()): ?>
         <hr class="text-white-50 mx-3">
+        <a class="nav-link" href="#" id="darkModeToggle">
+            <i class="bi bi-moon-fill" id="darkModeIcon"></i> <span id="darkModeLabel">Mode Gelap</span>
+        </a>
         <a class="nav-link <?= $activePage === 'users' ? 'active' : '' ?>" href="users.php">
             <i class="bi bi-shield-lock"></i> Manajemen User
         </a>
@@ -220,4 +283,32 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('show');
     document.querySelector('.sidebar-overlay').classList.toggle('show');
 }
+
+// Dark mode toggle
+(function() {
+    var theme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    updateDarkModeIcon(theme);
+    
+    document.getElementById('darkModeToggle').addEventListener('click', function(e) {
+        e.preventDefault();
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        updateDarkModeIcon(next);
+    });
+
+    function updateDarkModeIcon(theme) {
+        var icon = document.getElementById('darkModeIcon');
+        var label = document.getElementById('darkModeLabel');
+        if (theme === 'dark') {
+            icon.className = 'bi bi-sun-fill';
+            label.textContent = 'Mode Terang';
+        } else {
+            icon.className = 'bi bi-moon-fill';
+            label.textContent = 'Mode Gelap';
+        }
+    }
+})();
 </script>

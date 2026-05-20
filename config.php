@@ -38,11 +38,47 @@ if (session_status() === PHP_SESSION_NONE) {
         ini_set('session.cookie_samesite', 'Lax');
     }
     session_start();
-    
+
     // Regenerate session ID jika baru (anti session fixation)
     if (empty($_SESSION['initiated'])) {
         session_regenerate_id(true);
         $_SESSION['initiated'] = true;
+    }
+
+    // Session idle timeout — 30 menit
+    if (isLoggedIn() && isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
+        // Idle terlalu lama — logout paksa
+        $_SESSION = [];
+        session_destroy();
+        session_start();
+        if (empty($_SESSION['initiated'])) {
+            session_regenerate_id(true);
+            $_SESSION['initiated'] = true;
+        }
+        setFlash('info', 'Sesi Anda telah kadaluarsa karena tidak aktif. Silakan login kembali.');
+        header('Location: login.php');
+        exit;
+    }
+    $_SESSION['last_activity'] = time();
+}
+
+// ─── Security Headers ───
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-XSS-Protection: 0'); // Modern browsers prefer CSP
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+
+    // CSP — allow only necessary sources
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.jquery.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://cdn.jsdelivr.net; connect-src 'self'; base-uri 'self'; form-action 'self';");
+}
+
+// ─── HTTPS Enforcement (production) ───
+if (!empty($_ENV['FORCE_HTTPS']) && $_ENV['FORCE_HTTPS'] === 'true') {
+    if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === 'off') {
+        header('Location: https://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . ($_SERVER['REQUEST_URI'] ?? '/'));
+        exit;
     }
 }
 

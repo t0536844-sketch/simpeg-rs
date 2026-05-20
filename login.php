@@ -35,69 +35,153 @@ if (!isLoggedIn() && isset($_COOKIE['remember_token'])) {
 }
 
 $error = '';
+$lockout_remaining = 0;
+
+// ─── Rate Limiting Check ───
+$rate_file = __DIR__ . '/.login_attempts';
+$max_attempts = 5;
+$lockout_duration = 900; // 15 menit
+
+function readLoginAttempts() {
+    global $rate_file;
+    if (!file_exists($rate_file)) return [];
+    $data = @json_decode(file_get_contents($rate_file), true);
+    return is_array($data) ? $data : [];
+}
+
+function writeLoginAttempts($data) {
+    global $rate_file;
+    @file_put_contents($rate_file, json_encode($data), LOCK_EX);
+}
+
+function checkLoginLockout($ip) {
+    global $max_attempts, $lockout_duration, $lockout_remaining;
+    $attempts = readLoginAttempts();
+    $ipKey = 'ip_' . md5($ip);
+    $now = time();
+
+    if (isset($attempts[$ipKey])) {
+        $ipData = $attempts[$ipKey];
+        $windowStart = $now - $lockout_duration;
+
+        // Hapus percobaan yang sudah lewat 15 menit
+        $ipData['attempts'] = array_filter($ipData['attempts'], fn($t) => $t > $windowStart);
+
+        if (count($ipData['attempts']) >= $max_attempts) {
+            $lastAttempt = max($ipData['attempts']);
+            $lockout_remaining = ceil(($lastAttempt + $lockout_duration - $now) / 60);
+            return true;
+        }
+
+        $attempts[$ipKey] = $ipData;
+    }
+
+    writeLoginAttempts($attempts);
+    return false;
+}
+
+function recordFailedLogin($ip) {
+    global $max_attempts, $rate_file;
+    $attempts = readLoginAttempts();
+    $ipKey = 'ip_' . md5($ip);
+    $now = time();
+
+    if (!isset($attempts[$ipKey])) {
+        $attempts[$ipKey] = ['attempts' => []];
+    }
+
+    $attempts[$ipKey]['attempts'][] = $now;
+    writeLoginAttempts($attempts);
+}
+
+function clearLoginAttempts($ip) {
+    $attempts = readLoginAttempts();
+    $ipKey = 'ip_' . md5($ip);
+    unset($attempts[$ipKey]);
+    writeLoginAttempts($attempts);
+}
+
+// Cek apakah IP sedang di-lockout
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && checkLoginLockout($_SERVER['REMOTE_ADDR'] ?? 'unknown')) {
+    $error = 'Terlalu banyak percobaan login gagal. Silakan coba lagi dalam ' . $lockout_remaining . ' menit.';
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Validasi CSRF
     verify_csrf();
 
-    $database = new Database();
-    $db = $database->getConnection();
-
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $remember = isset($_POST['remember']);
-
-    if (empty($username) || empty($password)) {
-        $error = 'Username dan password wajib diisi!';
+    // Cek lockout
+    if (checkLoginLockout($_SERVER['REMOTE_ADDR'] ?? 'unknown')) {
+        $error = 'Terlalu banyak percobaan login gagal. Silakan coba lagi dalam ' . $lockout_remaining . ' menit.';
     } else {
-        $query = "SELECT * FROM users WHERE username = :username";
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(':username', $username);
-        $stmt->execute();
+        $database = new Database();
+        $db = $database->getConnection();
 
-        if ($stmt->rowCount() > 0) {
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $remember = isset($_POST['remember']);
 
-            // Verifikasi password dengan bcrypt
-            // Support backward: cek SHA256 lama kalau bcrypt gagal
-            $passwordValid = false;
-            if (verifyPassword($password, $user['password'])) {
-                $passwordValid = true;
-            } elseif ($user['password'] === hash('sha256', $password)) {
-                // Migration: upgrade dari SHA256 ke bcrypt
-                $newHash = hashPassword($password);
-                $updateStmt = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
-                $updateStmt->execute([$newHash, $user['id']]);
-                $passwordValid = true;
-            }
+        if (empty($username) || empty($password)) {
+            $error = 'Username dan password wajib diisi!';
+        } else {
+            $query = "SELECT * FROM users WHERE username = :username";
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':username', $username);
+            $stmt->execute();
 
-            if ($passwordValid) {
-                session_regenerate_id(true);
+            if ($stmt->rowCount() > 0) {
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
-                $_SESSION['login_time'] = time();
-
-                // Remember Me — set cookie 30 hari
-                if ($remember) {
-                    $token = bin2hex(random_bytes(32));
-                    $expires = date('Y-m-d H:i:s', strtotime('+30 days'));
-                    $stmt = $db->prepare("UPDATE users SET remember_token = ?, remember_token_expires = ? WHERE id = ?");
-                    $stmt->execute([$token, $expires, $user['id']]);
-                    setcookie('remember_token', $token, strtotime('+30 days'), '/', '', isset($_SERVER['HTTPS']), true);
+                // Verifikasi password dengan bcrypt
+                // Support backward: cek SHA256 lama kalau bcrypt gagal
+                $passwordValid = false;
+                if (verifyPassword($password, $user['password'])) {
+                    $passwordValid = true;
+                } elseif ($user['password'] === hash('sha256', $password)) {
+                    // Migration: upgrade dari SHA256 ke bcrypt
+                    $newHash = hashPassword($password);
+                    $updateStmt = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+                    $updateStmt->execute([$newHash, $user['id']]);
+                    $passwordValid = true;
                 }
 
-                logActivity($db, $user['id'], 'LOGIN', null, null, 'User login');
+                if ($passwordValid) {
+                    // Clear failed attempts on successful login
+                    clearLoginAttempts($_SERVER['REMOTE_ADDR'] ?? 'unknown');
 
-                header("Location: dashboard.php");
-                exit();
+                    session_regenerate_id(true);
+
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['role'] = $user['role'];
+                    $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
+                    $_SESSION['login_time'] = time();
+
+                    // Remember Me — set cookie 30 hari
+                    if ($remember) {
+                        $token = bin2hex(random_bytes(32));
+                        $expires = date('Y-m-d H:i:s', strtotime('+30 days'));
+                        $stmt = $db->prepare("UPDATE users SET remember_token = ?, remember_token_expires = ? WHERE id = ?");
+                        $stmt->execute([$token, $expires, $user['id']]);
+                        setcookie('remember_token', $token, strtotime('+30 days'), '/', '', isset($_SERVER['HTTPS']), true);
+                    }
+
+                    logActivity($db, $user['id'], 'LOGIN', null, null, 'User login');
+
+                    $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                    header("Location: $proto://$host/dashboard.php");
+                    exit();
+                } else {
+                    recordFailedLogin($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+                    $remaining = $max_attempts - (count(readLoginAttempts()['ip_' . md5($_SERVER['REMOTE_ADDR'] ?? 'unknown')]['attempts'] ?? []));
+                    $error = 'Password salah! Sisa percobaan: ' . max(0, $remaining);
+                }
             } else {
-                $error = 'Password salah!';
+                recordFailedLogin($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+                $remaining = $max_attempts - (count(readLoginAttempts()['ip_' . md5($_SERVER['REMOTE_ADDR'] ?? 'unknown')]['attempts'] ?? []));
+                $error = 'Username tidak ditemukan! Sisa percobaan: ' . max(0, $remaining);
             }
-        } else {
-            $error = 'Username tidak ditemukan!';
         }
     }
 }

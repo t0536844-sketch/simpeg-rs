@@ -25,10 +25,35 @@ foreach ($queries as $key => $q) {
 $recentStmt = $db->query("SELECT * FROM pegawai ORDER BY created_at DESC LIMIT 10");
 $recentEmployees = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// STR/SIP expiring alerts
+$expiringDocs = $db->query("
+    SELECT nama_lengkap, 'STR' as doc, masa_berlaku_str as expiry FROM pegawai WHERE masa_berlaku_str IS NOT NULL AND masa_berlaku_str != '' AND masa_berlaku_str <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    UNION ALL
+    SELECT nama_lengkap, 'SIP' as doc, masa_berlaku_sip as expiry FROM pegawai WHERE masa_berlaku_sip IS NOT NULL AND masa_berlaku_sip != '' AND masa_berlaku_sip <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    ORDER BY expiry ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
 $pageTitle = 'Dashboard';
 $activePage = 'dashboard';
 require __DIR__ . '/includes/layout.php';
 ?>
+
+<?php if (!empty($expiringDocs)): ?>
+<div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+    <h6 class="alert-heading"><i class="bi bi-exclamation-triangle me-1"></i> Peringatan Masa Berlaku Dokumen</h6>
+    <p class="mb-2 small">Ada <strong><?= count($expiringDocs) ?></strong> dokumen yang akan segera kadaluarsa atau sudah kadaluarsa (30 hari terakhir):</p>
+    <ul class="mb-0 small">
+        <?php foreach ($expiringDocs as $d): 
+            $days = floor((strtotime($d['expiry']) - time()) / 86400);
+            $badge = $days <= 0 ? 'bg-danger' : 'bg-warning';
+            $label = $days <= 0 ? 'Kadaluarsa' : $days . ' hari lagi';
+        ?>
+        <li><strong><?= e($d['nama_lengkap']) ?></strong> — <?= e($d['doc']) ?> (<?= date('d/m/Y', strtotime($d['expiry'])) ?>) <span class="badge <?= $badge ?>"><?= $label ?></span></li>
+        <?php endforeach; ?>
+    </ul>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+<?php endif; ?>
 
 <!-- Stats Cards -->
 <div class="row g-3 mb-4">

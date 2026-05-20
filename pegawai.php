@@ -8,6 +8,9 @@ $db = $database->getConnection();
 
 $search = sanitize($_GET['search'] ?? '');
 $statusFilter = sanitize($_GET['status'] ?? '');
+$page = max(1, sanitizeInt($_GET['page'] ?? 1, 1));
+$perPage = 25;
+$offset = ($page - 1) * $perPage;
 
 $query = "SELECT * FROM pegawai WHERE 1=1";
 $params = [];
@@ -20,7 +23,22 @@ if ($statusFilter) {
     $query .= " AND status_kepegawaian = ?";
     $params[] = $statusFilter;
 }
-$query .= " ORDER BY nama_lengkap ASC";
+
+// Count total for pagination
+$countQuery = "SELECT COUNT(*) as c FROM pegawai WHERE 1=1";
+$countParams = [];
+if ($search) {
+    $countQuery .= " AND (nama_lengkap LIKE ? OR nip LIKE ? OR jabatan LIKE ?)";
+    $countParams = ["%$search%", "%$search%", "%$search%"];
+}
+if ($statusFilter) {
+    $countQuery .= " AND status_kepegawaian = ?";
+    $countParams[] = $statusFilter;
+}
+$totalRecords = $db->query($countQuery, $countParams)->fetch(PDO::FETCH_ASSOC)['c'];
+$totalPages = ceil($totalRecords / $perPage);
+
+$query .= " ORDER BY nama_lengkap ASC LIMIT $perPage OFFSET $offset";
 
 $stmt = $db->prepare($query);
 $stmt->execute($params);
@@ -30,19 +48,7 @@ $pageTitle = 'Data Pegawai';
 $activePage = 'pegawai';
 $breadcrumb = [['label' => 'Data Pegawai', 'active' => true]];
 $headerActions = '<a href="tambah_pegawai.php" class="btn btn-primary"><i class="bi bi-person-plus"></i> Tambah Pegawai</a>';
-$extraCSS = '<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">';
-$extraJS = '<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-<script>
-$(document).ready(function() {
-    $("#pegawaiTable").DataTable({
-        language: { url: "//cdn.datatables.net/plug-ins/1.13.7/i18n/id.json" },
-        pageLength: 25,
-        columnDefs: [{ targets: -1, orderable: false }]
-    });
-});
-</script>';
+$extraCSS = '';
 require __DIR__ . '/includes/layout.php';
 ?>
 
@@ -73,7 +79,7 @@ require __DIR__ . '/includes/layout.php';
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table id="pegawaiTable" class="table table-hover mb-0">
+            <table class="table table-hover mb-0">
                 <thead>
                     <tr>
                         <th>No</th><th>Nama Lengkap</th><th>NIP</th><th>Jabatan</th>
@@ -81,7 +87,7 @@ require __DIR__ . '/includes/layout.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php $no = 1; foreach ($pegawai as $row): ?>
+                    <?php $no = $offset + 1; foreach ($pegawai as $row): ?>
                     <tr>
                         <td><?= $no++ ?></td>
                         <td><?= e($row['nama_lengkap']) ?></td>
@@ -115,6 +121,48 @@ require __DIR__ . '/includes/layout.php';
             </table>
         </div>
     </div>
+
+    <!-- Pagination -->
+    <?php if ($totalPages > 1): ?>
+    <div class="card-footer bg-white">
+        <nav aria-label="Pagination">
+            <ul class="pagination justify-content-center mb-0">
+                <?php
+                $queryParams = $_GET;
+                $pageFn = function($p) use ($queryParams) {
+                    $queryParams['page'] = $p;
+                    return '?' . http_build_query($queryParams);
+                };
+                ?>
+                <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= $pageFn($page - 1) ?>">&laquo; Prev</a>
+                </li>
+                <?php
+                $start = max(1, $page - 2);
+                $end = min($totalPages, $page + 2);
+                if ($start > 1): ?>
+                <li class="page-item"><a class="page-link" href="<?= $pageFn(1) ?>">1</a></li>
+                <?php if ($start > 2): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
+                <?php endif; ?>
+                <?php for ($i = $start; $i <= $end; $i++): ?>
+                <li class="page-item <?= $i === $page ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= $pageFn($i) ?>"><?= $i ?></a>
+                </li>
+                <?php endfor; ?>
+                <?php if ($end < $totalPages): ?>
+                <?php if ($end < $totalPages - 1): ?><li class="page-item disabled"><span class="page-link">...</span></li><?php endif; ?>
+                <li class="page-item"><a class="page-link" href="<?= $pageFn($totalPages) ?>"><?= $totalPages ?></a></li>
+                <?php endif; ?>
+                <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= $pageFn($page + 1) ?>">Next &raquo;</a>
+                </li>
+            </ul>
+        </nav>
+        <div class="text-center mt-2">
+            <small class="text-muted">Menampilkan <?= $offset + 1 ?>–<?= min($offset + $perPage, $totalRecords) ?> dari <?= $totalRecords ?> data</small>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <?php

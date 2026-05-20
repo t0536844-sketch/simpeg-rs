@@ -102,14 +102,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } catch (Exception $e) {
         $error = $e->getMessage();
-        // Cleanup on error
-        if (isset($newDir) && is_dir($newDir)) {
-            array_map('unlink', glob("$newDir/*/*") ?: glob("$newDir/*") ?: []);
-            @rmdir($newDir);
-        }
-        if (isset($oldDir) && is_dir($oldDir)) {
-            array_map('unlink', glob("$oldDir/*/*") ?: glob("$oldDir/*") ?: []);
-            @rmdir($oldDir);
+        // Cleanup on error — recursive delete
+        $cleanupDirs = [];
+        if (isset($newDir)) $cleanupDirs[] = $newDir;
+        if (isset($oldDir)) $cleanupDirs[] = $oldDir;
+        foreach ($cleanupDirs as $dir) {
+            if (is_dir($dir)) {
+                $files = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                    RecursiveIteratorIterator::CHILD_FIRST
+                );
+                foreach ($files as $file) {
+                    $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+                }
+                rmdir($dir);
+            }
         }
     }
 }
