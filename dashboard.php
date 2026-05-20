@@ -138,49 +138,33 @@ require __DIR__ . '/includes/layout.php';
 <?php endif; ?>
 
 <!-- Stats Cards -->
-<div class="row g-3 mb-4">
+<div class="row g-4 mb-4">
     <div class="col-sm-6 col-xl-3">
-        <div class="stat-card" style="background:linear-gradient(135deg,var(--primary),var(--secondary))">
-            <div class="d-flex justify-content-between">
-                <div>
-                    <small>Total Pegawai</small>
-                    <h2 class="mb-0"><?= $stats['total'] ?></h2>
-                </div>
-                <i class="bi bi-people-fill" style="font-size:2.5rem;opacity:.4"></i>
-            </div>
+        <div class="stat-card bg-gradient-primary">
+            <div class="stat-number"><?= number_format($stats['total']) ?></div>
+            <div class="stat-label"><i class="bi bi-people-fill me-1"></i>Total Pegawai</div>
+            <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
-        <div class="stat-card" style="background:linear-gradient(135deg,#10b981,#059669)">
-            <div class="d-flex justify-content-between">
-                <div>
-                    <small>PNS</small>
-                    <h2 class="mb-0"><?= $stats['pns'] ?></h2>
-                </div>
-                <i class="bi bi-person-check-fill" style="font-size:2.5rem;opacity:.4"></i>
-            </div>
+        <div class="stat-card bg-gradient-success">
+            <div class="stat-number"><?= number_format($stats['pns']) ?></div>
+            <div class="stat-label"><i class="bi bi-person-check-fill me-1"></i>PNS</div>
+            <div class="stat-icon"><i class="bi bi-person-check-fill"></i></div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
-        <div class="stat-card" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">
-            <div class="d-flex justify-content-between">
-                <div>
-                    <small>Honorer</small>
-                    <h2 class="mb-0"><?= $stats['honorer'] ?></h2>
-                </div>
-                <i class="bi bi-person" style="font-size:2.5rem;opacity:.4"></i>
-            </div>
+        <div class="stat-card bg-gradient-info">
+            <div class="stat-number"><?= number_format($stats['honorer']) ?></div>
+            <div class="stat-label"><i class="bi bi-person me-1"></i>Honorer</div>
+            <div class="stat-icon"><i class="bi bi-person"></i></div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-3">
-        <div class="stat-card" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
-            <div class="d-flex justify-content-between">
-                <div>
-                    <small>Aktif</small>
-                    <h2 class="mb-0"><?= $stats['aktif'] ?></h2>
-                </div>
-                <i class="bi bi-check-circle" style="font-size:2.5rem;opacity:.4"></i>
-            </div>
+        <div class="stat-card bg-gradient-warning">
+            <div class="stat-number"><?= number_format($stats['aktif']) ?></div>
+            <div class="stat-label"><i class="bi bi-check-circle me-1"></i>Aktif Bekerja</div>
+            <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
         </div>
     </div>
 </div>
