@@ -254,9 +254,37 @@ if (!isset($breadcrumb)) $breadcrumb = [];
             .sidebar-toggle { display: flex; align-items: center; justify-content: center; }
         }
 
+        /* Collapsible sidebar (desktop) */
+        .sidebar-collapsed .sidebar { transform: translateX(-100%); }
+        .sidebar-collapsed .main-content { margin-left: 0 !important; }
+        .sidebar-expand-btn {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 1055;
+            width: 44px;
+            height: 44px;
+            background: var(--gradient-1);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: none;
+        }
+        .sidebar-collapsed .sidebar-expand-btn { display: flex !important; }
+        .sidebar-expand-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(99,102,241,0.5);
+        }
+
         /* Print */
         @media print {
-            .sidebar, .sidebar-toggle, .no-print { display: none !important; }
+            .sidebar, .sidebar-toggle, .sidebar-expand-btn, .no-print { display: none !important; }
             .main-content { margin: 0; padding: 0; }
         }
     </style>
@@ -316,12 +344,20 @@ if (!isset($breadcrumb)) $breadcrumb = [];
             <i class="bi bi-clock-history"></i> Audit Logs
         </a>
         <?php endif; ?>
-        <div class="mt-auto pt-4"></div>
+        <hr class="text-white-50 mx-3">
         <a class="nav-link text-danger" href="logout.php">
             <i class="bi bi-box-arrow-right"></i> Logout
         </a>
+        <a class="nav-link" href="#" id="sidebarCollapse" title="Sembunyikan sidebar">
+            <i class="bi bi-layout-sidebar-inset"></i> <span>Perkecil Menu</span>
+        </a>
     </nav>
 </aside>
+
+<!-- Expand sidebar button (visible when collapsed) -->
+<button class="sidebar-expand-btn" id="sidebarExpand" title="Tampilkan sidebar">
+    <i class="bi bi-layout-sidebar"></i>
+</button>
 
 <!-- Main content wrapper -->
 <div class="main-content">
@@ -385,6 +421,33 @@ function toggleSidebar() {
             icon.className = 'bi bi-moon-fill';
             label.textContent = 'Mode Gelap';
         }
+    }
+})();
+
+// Sidebar collapse/expand (desktop)
+(function() {
+    var body = document.body;
+    var sidebarState = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (sidebarState) {
+        body.classList.add('sidebar-collapsed');
+    }
+
+    var collapseBtn = document.getElementById('sidebarCollapse');
+    var expandBtn = document.getElementById('sidebarExpand');
+
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            body.classList.add('sidebar-collapsed');
+            localStorage.setItem('sidebarCollapsed', 'true');
+        });
+    }
+
+    if (expandBtn) {
+        expandBtn.addEventListener('click', function() {
+            body.classList.remove('sidebar-collapsed');
+            localStorage.setItem('sidebarCollapsed', 'false');
+        });
     }
 })();
 </script>
