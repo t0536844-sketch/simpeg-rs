@@ -10,8 +10,8 @@ WORKDIR /app
 # Copy all app files
 COPY . /app/
 
-# Create data and sessions directories with proper permissions
-RUN mkdir -p data sessions && chmod -R 777 data sessions
+# Create data and sessions directories (running as root, so no chmod needed)
+RUN mkdir -p data sessions
 
 # Set SQLite mode
 ENV USE_SQLITE=true
