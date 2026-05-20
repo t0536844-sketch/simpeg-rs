@@ -149,7 +149,52 @@ class Database {
             $this->initSQLite();
         }
 
+        // Always try to seed — seedSQLite checks existence before inserting
+        // This fixes old DBs that may have been created without seed data
+        $this->migrateSQLite();
+
         return $this->conn;
+    }
+
+    /** Run migration if database schema is broken or missing */
+    private function migrateSQLite() {
+        $dbPath = __DIR__ . '/data/rsud_mimika.db';
+
+        try {
+            // Check if required tables exist
+            $tables = $this->conn->query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users','pegawai','logs')")->fetchAll(PDO::FETCH_COLUMN);
+
+            // If any table is missing, recreate from scratch
+            if (count($tables) < 3) {
+                // Delete broken DB and re-init
+                if (file_exists($dbPath)) @unlink($dbPath);
+                if (file_exists($dbPath . '-wal')) @unlink($dbPath . '-wal');
+                if (file_exists($dbPath . '-shm')) @unlink($dbPath . '-shm');
+
+                $this->conn = new PDO("sqlite:$dbPath");
+                $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+                $this->conn->exec('PRAGMA journal_mode=WAL');
+                $this->conn->exec('PRAGMA foreign_keys=ON');
+                $this->initSQLite();
+                return;
+            }
+
+            // Tables exist, try to seed
+            $this->seedSQLite();
+        } catch (Exception $e) {
+            // If anything fails, recreate DB from scratch
+            if (file_exists($dbPath)) @unlink($dbPath);
+            if (file_exists($dbPath . '-wal')) @unlink($dbPath . '-wal');
+            if (file_exists($dbPath . '-shm')) @unlink($dbPath . '-shm');
+
+            $this->conn = new PDO("sqlite:$dbPath");
+            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            $this->conn->exec('PRAGMA journal_mode=WAL');
+            $this->conn->exec('PRAGMA foreign_keys=ON');
+            $this->initSQLite();
+        }
     }
 
     private function initSQLite() {
@@ -183,8 +228,31 @@ class Database {
             try {
                 $this->conn->exec($stmt);
             } catch (Exception $e) {
-                // Skip - table/record may already exist
+                // Skip - table may already exist
             }
+        }
+
+        // Seed default admin user (password: admin123)
+        $this->seedSQLite();
+    }
+
+    private function seedSQLite() {
+        // Check if admin user already exists
+        $stmt = $this->conn->query("SELECT COUNT(*) FROM users WHERE username = 'admin'");
+        $count = $stmt->fetchColumn();
+
+        if ($count == 0) {
+            $stmt = $this->conn->prepare("INSERT INTO users (username, password, nama_lengkap, role) VALUES (?, ?, ?, ?)");
+            $stmt->execute(['admin', '$2y$12$UCLvTpnKl1Y3nPu4v.zQYuKoppkmUEjwaPYtlE/JVVk.i.3BZtCAe', 'Administrator', 'admin']);
+        }
+
+        // Check if sample pegawai already exists
+        $stmt = $this->conn->query("SELECT COUNT(*) FROM pegawai");
+        $count = $stmt->fetchColumn();
+
+        if ($count == 0) {
+            $stmt = $this->conn->prepare("INSERT INTO pegawai (nama_lengkap, tempat_lahir, tanggal_lahir, agama, jenis_kelamin, nip, pangkat_golongan, pendidikan, status_pernikahan, jabatan, status_kepegawaian) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute(['Uji coba data', 'Nabire', '1990-01-31', 'Konghucu', 'Pria', '123123123', 'IV/a', 'S1 ilmu kesehatan masyarakat', 'Menikah', 'Staf', 'PNS']);
         }
     }
 }
