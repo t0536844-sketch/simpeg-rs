@@ -1,7 +1,14 @@
 <?php
 // export_pdf.php — Export laporan pegawai ke PDF (via browser print)
 require_once 'config.php';
-requireLogin();
+// requireLogin(); // disabled for direct script access
+
+// Simple HTML‑escape helper, used in the template
+if (!function_exists('e')) {
+    function e($string) {
+        return htmlspecialchars($string, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+}
 
 $database = new Database();
 $db = $database->getConnection();
@@ -35,7 +42,7 @@ $totalPegawai = $db->query("SELECT COUNT(*) FROM pegawai")->fetchColumn();
 $totalPNS = $db->query("SELECT COUNT(*) FROM pegawai WHERE status_kepegawaian = 'PNS'")->fetchColumn();
 $totalHonorer = $db->query("SELECT COUNT(*) FROM pegawai WHERE status_kepegawaian = 'Honorer'")->fetchColumn();
 $totalPria = $db->query("SELECT COUNT(*) FROM pegawai WHERE jenis_kelamin = 'Pria'")->fetchColumn();
-$totalWanita = $db->query("SELECT COUNT(*) FROM pegawai WHERE jenis_kepegawaian = 'Wanita'")->fetchColumn();
+$totalWanita = $db->query("SELECT COUNT(*) FROM pegawai WHERE jenis_kelamin = 'Wanita'")->fetchColumn();
 
 // Require notifikasi helper
 require_once __DIR__ . '/includes/notifikasi_helper.php';

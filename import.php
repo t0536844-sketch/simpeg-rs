@@ -21,11 +21,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
             $count = 0;
             $errors = [];
 
+            // Suppress deprecation warnings for fgetcsv in older PHP versions
+            error_reporting(E_ALL & ~E_DEPRECATED);
             $handle = fopen($tmpPath, 'r');
             if ($handle === false) {
                 setFlash('error', 'Gagal membaca file CSV.');
             } else {
-                $headers = fgetcsv($handle);
+                $headers = @fgetcsv($handle);
 
                 // Map header columns to database fields
                 $columnMap = [];
@@ -54,9 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
                 if (empty($columnMap)) {
                     setFlash('error', 'Tidak ada kolom yang dikenali. Pastikan CSV memiliki header yang sesuai.');
                 } else {
-                    $query = "INSERT INTO pegawai (nama_lengkap, nip, jabatan, status_kepegawaian, jenis_kelamin, agama, pangkat_golongan, pendidikan, tempat_lahir, tanggal_lahir, alamat_rumah, jumlah_keluarga)
-                              VALUES (:nama_lengkap, :nip, :jabatan, :status_kepegawaian, :jenis_kelamin, :agama, :pangkat_golongan, :pendidikan, :tempat_lahir, :tanggal_lahir, :alamat_rumah, :jumlah_keluarga)
-                              ON DUPLICATE KEY UPDATE nama_lengkap=VALUES(nama_lengkap)";
+                    // SQLite uses INSERT OR REPLACE to upsert
+$query = "INSERT OR REPLACE INTO pegawai (nama_lengkap, nip, jabatan, status_kepegawaian, jenis_kelamin, agama, pangkat_golongan, pendidikan, tempat_lahir, tanggal_lahir, alamat_rumah, jumlah_keluarga)
+          VALUES (:nama_lengkap, :nip, :jabatan, :status_kepegawaian, :jenis_kelamin, :agama, :pangkat_golongan, :pendidikan, :tempat_lahir, :tanggal_lahir, :alamat_rumah, :jumlah_keluarga)";
 
                     $stmt = $db->prepare($query);
 

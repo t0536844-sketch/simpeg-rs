@@ -35,11 +35,21 @@ $output = fopen('php://output', 'w');
 // BOM for UTF-8 (Excel compatible)
 fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-$headers = array_keys($data[0]);
-fputcsv($output, $headers);
-
+$columns = [
+    'nama_lengkap','tempat_lahir','tanggal_lahir','agama','jenis_kelamin','nip',
+    'pangkat_golongan','pendidikan','status_pernikahan','jabatan','status_kepegawaian',
+    'link_sk','jumlah_keluarga','alamat_rumah','link_ktp','link_kartu_keluarga',
+    'link_ijazah','link_str','masa_berlaku_str','link_sip','masa_berlaku_sip','nomor_kartu_pegawai',
+    'link_npwp','link_foto','link_akta_lahir','link_akta_nikah','link_skp','link_sk_kenaikan_pangkat',
+    'link_sk_jabatan','link_sk_mutasi','link_sk_pensiun','link_sertifikat'
+];
+$fputcsv($output, $columns);
 foreach ($data as $row) {
-    fputcsv($output, $row);
+    $rowData = [];
+    foreach ($columns as $col) {
+        $rowData[] = $row[$col] ?? '';
+    }
+    fputcsv($output, $rowData);
 }
 
 fclose($output);

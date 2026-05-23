@@ -30,9 +30,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $uploadedFiles = [];
 
+        // Upload files to a temporary folder using only the sanitized name
+        $tempDir = UPLOAD_DIR . $namaFolder . '/';
         foreach ($field_folders as $field => $folderName) {
             if (isset($_FILES[$field]) && $_FILES[$field]['error'] === UPLOAD_ERR_OK) {
-                $typeDir = UPLOAD_DIR . $namaFolder . '/' . $folderName . '/';
+                $typeDir = $tempDir . $folderName . '/';
                 $result = processUpload($_FILES[$field], $typeDir);
                 if (!$result['success']) throw new Exception($result['error']);
                 $uploadedFiles[$field] = $result['path'];
@@ -48,17 +50,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             link_ijazah, link_str, masa_berlaku_str, link_sip, masa_berlaku_sip,
             nomor_kartu_pegawai, link_npwp, link_foto, link_akta_lahir, link_akta_nikah,
             link_skp, link_sk_kenaikan_pangkat, link_sk_jabatan, link_sk_mutasi,
-            link_sk_pensiun, link_sertifikat
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            link_sk_pensiun, link_sertifikat) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
         $stmt = $db->prepare($query);
+        // Prepare values, allowing NIP to be NULL if empty
+        $nip = sanitize($_POST['nip'] ?? null);
+        $nip = ($nip === '' || $nip === null) ? null : $nip;
         $stmt->execute([
             $nama,
             sanitize($_POST['tempat_lahir'] ?? ''),
             sanitizeDate($_POST['tanggal_lahir'] ?? ''),
             sanitize($_POST['agama'] ?? ''),
             sanitize($_POST['jenis_kelamin'] ?? 'Pria'),
-            sanitize($_POST['nip'] ?? ''),
+            $nip,
             sanitize($_POST['pangkat_golongan'] ?? ''),
             sanitize($_POST['pendidikan'] ?? ''),
             sanitize($_POST['status_pernikahan'] ?? ''),
