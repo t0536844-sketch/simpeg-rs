@@ -85,7 +85,7 @@ require __DIR__ . '/includes/layout.php';
                 <thead>
                     <tr>
                         <th>No</th><th>Nama Lengkap</th><th>NIP</th><th>Jabatan</th>
-                        <th>Pangkat/Gol</th><th>Status</th><th>Jenis Kelamin</th><th class="no-print">Aksi</th>
+                        <th>Pangkat/Gol</th><th>Status</th><th>Jenis Kelamin</th><th>Dokumen</th><th class="no-print">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -104,6 +104,13 @@ require __DIR__ . '/includes/layout.php';
                             ?>"><?= e($row['status_kepegawaian']) ?></span>
                         </td>
                         <td><?= e($row['jenis_kelamin']) ?></td>
+                        <td>
+                            <?php
+                                $hasSTR = !empty($row['masa_berlaku_str']) && $row['masa_berlaku_str'] !== '-';
+                                $hasSIP = !empty($row['masa_berlaku_sip']) && $row['masa_berlaku_sip'] !== '-';
+                                echo $hasSTR && $hasSIP ? '<span class="badge bg-success">Lengkap</span>' : '<span class="badge bg-danger">Tidak Lengkap</span>';
+                            ?>
+                        </td>
                         <td class="no-print">
                             <div class="btn-group btn-group-sm">
                                 <a href="detail_pegawai.php?id=<?= $row['id'] ?>" class="btn btn-outline-info" title="Detail"><i class="bi bi-eye"></i></a>
